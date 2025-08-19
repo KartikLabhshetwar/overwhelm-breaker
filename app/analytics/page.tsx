@@ -1,0 +1,373 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Navigation } from "@/components/navigation"
+import { ArrowLeft, TrendingUp, Clock, Target, Zap, Calendar, CheckCircle, AlertCircle } from "lucide-react"
+import Link from "next/link"
+
+interface AnalyticsData {
+  totalSessions: number
+  totalFocusTime: number
+  completionRate: number
+  averageSessionLength: number
+  energyDistribution: {
+    high: number
+    med: number
+    low: number
+  }
+  weeklyProgress: {
+    week: string
+    sessions: number
+    focusTime: number
+    completions: number
+  }[]
+  recentSessions: {
+    id: string
+    chunkTitle: string
+    projectTitle: string
+    startedAt: string
+    outcome: string
+    actualMin: number
+    reflection?: string
+  }[]
+  insights: string[]
+}
+
+export default function AnalyticsPage() {
+  const { data: session } = useSession()
+  const router = useRouter()
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+  const [timeRange, setTimeRange] = useState("week") // week, month, all
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    if (!session?.user?.id) return
+
+    const fetchAnalytics = async () => {
+      try {
+        const response = await fetch(`/api/analytics?range=${timeRange}`)
+        if (response.ok) {
+          const data = await response.json()
+          setAnalytics(data)
+        }
+      } catch (error) {
+        console.error("Error fetching analytics:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchAnalytics()
+  }, [session, timeRange])
+
+  const getOutcomeColor = (outcome: string) => {
+    switch (outcome) {
+      case "done":
+        return "bg-green-100 text-green-800"
+      case "stuck":
+        return "bg-orange-100 text-orange-800"
+      case "snoozed":
+        return "bg-blue-100 text-blue-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getOutcomeIcon = (outcome: string) => {
+    switch (outcome) {
+      case "done":
+        return <CheckCircle className="w-4 h-4" />
+      case "stuck":
+        return <AlertCircle className="w-4 h-4" />
+      case "snoozed":
+        return <Clock className="w-4 h-4" />
+      default:
+        return <Clock className="w-4 h-4" />
+    }
+  }
+
+  if (!session) {
+    router.push("/auth/signin")
+    return null
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50">
+        <Navigation />
+        <div className="container mx-auto px-4 py-8 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!analytics) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50">
+        <Navigation />
+        <div className="container mx-auto px-4 py-8 text-center">
+          <p className="text-emerald-700">
+            No analytics data available yet. Complete some focus sessions to see insights!
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50">
+      <Navigation />
+
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="mb-6">
+          <Link href="/dashboard" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-4">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </Link>
+
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-emerald-900 mb-2">Your Productivity Analytics</h1>
+              <p className="text-emerald-700">Track your progress and optimize your focus sessions</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant={timeRange === "week" ? "default" : "outline"}
+                onClick={() => setTimeRange("week")}
+                size="sm"
+                className={timeRange === "week" ? "bg-emerald-600 hover:bg-emerald-700" : "border-emerald-200"}
+              >
+                This Week
+              </Button>
+              <Button
+                variant={timeRange === "month" ? "default" : "outline"}
+                onClick={() => setTimeRange("month")}
+                size="sm"
+                className={timeRange === "month" ? "bg-emerald-600 hover:bg-emerald-700" : "border-emerald-200"}
+              >
+                This Month
+              </Button>
+              <Button
+                variant={timeRange === "all" ? "default" : "outline"}
+                onClick={() => setTimeRange("all")}
+                size="sm"
+                className={timeRange === "all" ? "bg-emerald-600 hover:bg-emerald-700" : "border-emerald-200"}
+              >
+                All Time
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="border-emerald-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-emerald-700">Total Sessions</CardTitle>
+              <Target className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-900">{analytics.totalSessions}</div>
+              <p className="text-xs text-emerald-600">Focus sessions completed</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-emerald-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-emerald-700">Focus Time</CardTitle>
+              <Clock className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-900">
+                {Math.floor(analytics.totalFocusTime / 60)}h {analytics.totalFocusTime % 60}m
+              </div>
+              <p className="text-xs text-emerald-600">Total focused work time</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-emerald-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-emerald-700">Completion Rate</CardTitle>
+              <CheckCircle className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-900">{Math.round(analytics.completionRate)}%</div>
+              <p className="text-xs text-emerald-600">Sessions completed successfully</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-emerald-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-emerald-700">Avg Session</CardTitle>
+              <TrendingUp className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-900">{Math.round(analytics.averageSessionLength)}m</div>
+              <p className="text-xs text-emerald-600">Average session length</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Energy Distribution */}
+          <Card className="border-emerald-200">
+            <CardHeader>
+              <CardTitle className="text-emerald-900 flex items-center">
+                <Zap className="w-5 h-5 mr-2" />
+                Energy Level Distribution
+              </CardTitle>
+              <CardDescription className="text-emerald-700">
+                How you distribute your energy across tasks
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <span className="text-sm text-emerald-800">High Energy</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-red-500 h-2 rounded-full"
+                        style={{ width: `${(analytics.energyDistribution.high / analytics.totalSessions) * 100}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-sm font-medium text-emerald-900">{analytics.energyDistribution.high}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <span className="text-sm text-emerald-800">Medium Energy</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-yellow-500 h-2 rounded-full"
+                        style={{ width: `${(analytics.energyDistribution.med / analytics.totalSessions) * 100}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-sm font-medium text-emerald-900">{analytics.energyDistribution.med}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <span className="text-sm text-emerald-800">Low Energy</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-green-500 h-2 rounded-full"
+                        style={{ width: `${(analytics.energyDistribution.low / analytics.totalSessions) * 100}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-sm font-medium text-emerald-900">{analytics.energyDistribution.low}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Weekly Progress */}
+          <Card className="border-emerald-200">
+            <CardHeader>
+              <CardTitle className="text-emerald-900 flex items-center">
+                <Calendar className="w-5 h-5 mr-2" />
+                Weekly Progress
+              </CardTitle>
+              <CardDescription className="text-emerald-700">Your productivity trend over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {analytics.weeklyProgress.map((week, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-emerald-900">{week.week}</p>
+                      <p className="text-sm text-emerald-700">{week.sessions} sessions</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-emerald-900">
+                        {Math.floor(week.focusTime / 60)}h {week.focusTime % 60}m
+                      </p>
+                      <p className="text-sm text-emerald-700">{week.completions} completed</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Insights */}
+        <Card className="border-emerald-200 mb-8">
+          <CardHeader>
+            <CardTitle className="text-emerald-900">Productivity Insights</CardTitle>
+            <CardDescription className="text-emerald-700">
+              AI-powered recommendations to improve your focus sessions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {analytics.insights.map((insight, index) => (
+                <div key={index} className="flex items-start gap-3 p-3 bg-emerald-50 rounded-lg">
+                  <TrendingUp className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-emerald-800">{insight}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Sessions */}
+        <Card className="border-emerald-200">
+          <CardHeader>
+            <CardTitle className="text-emerald-900">Recent Sessions</CardTitle>
+            <CardDescription className="text-emerald-700">Your latest focus session activity</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {analytics.recentSessions.length === 0 ? (
+                <p className="text-emerald-600 text-center py-8">No sessions completed yet</p>
+              ) : (
+                analytics.recentSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="flex items-start justify-between p-4 border border-emerald-100 rounded-lg"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-medium text-emerald-900">{session.chunkTitle}</h4>
+                        <Badge className={getOutcomeColor(session.outcome)} size="sm">
+                          {getOutcomeIcon(session.outcome)}
+                          <span className="ml-1 capitalize">{session.outcome}</span>
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-emerald-700 mb-2">{session.projectTitle}</p>
+                      {session.reflection && <p className="text-sm text-emerald-600 italic">"{session.reflection}"</p>}
+                    </div>
+                    <div className="text-right text-sm text-emerald-600">
+                      <p>{new Date(session.startedAt).toLocaleDateString()}</p>
+                      <p>{session.actualMin} minutes</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
