@@ -153,6 +153,7 @@ export default function SettingsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="UTC">UTC</SelectItem>
+                      <SelectItem value="Asia/Kolkata">India Standard Time (IST)</SelectItem>
                       <SelectItem value="America/New_York">Eastern Time</SelectItem>
                       <SelectItem value="America/Chicago">Central Time</SelectItem>
                       <SelectItem value="America/Denver">Mountain Time</SelectItem>
@@ -160,6 +161,9 @@ export default function SettingsPage() {
                       <SelectItem value="Europe/London">London</SelectItem>
                       <SelectItem value="Europe/Paris">Paris</SelectItem>
                       <SelectItem value="Asia/Tokyo">Tokyo</SelectItem>
+                      <SelectItem value="Asia/Shanghai">Shanghai</SelectItem>
+                      <SelectItem value="Asia/Dubai">Dubai</SelectItem>
+                      <SelectItem value="Australia/Sydney">Sydney</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
