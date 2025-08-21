@@ -10,20 +10,30 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, account, user }) {
-      if (account) {
-        token.accessToken = account.access_token
+      try {
+        if (account) {
+          token.accessToken = account.access_token
+        }
+        if (user) {
+          token.id = user.id
+        }
+        return token
+      } catch (error) {
+        console.error("[v0] JWT callback error:", error)
+        return token
       }
-      if (user) {
-        token.id = user.id
-      }
-      return token
     },
     async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string
-        session.accessToken = token.accessToken as string
+      try {
+        if (token) {
+          session.user.id = token.id as string
+          session.accessToken = token.accessToken as string
+        }
+        return session
+      } catch (error) {
+        console.error("[v0] Session callback error:", error)
+        return session
       }
-      return session
     },
   },
   pages: {
@@ -31,6 +41,11 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  jwt: {
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
 }
