@@ -1,13 +1,11 @@
 import { betterAuth } from "better-auth"
-// import { drizzleAdapter } from "better-auth/adapters/drizzle"
-import { nextCookies } from "better-auth/next-js"
-// import { db } from "@/lib/db"
+import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { db } from "@/lib/db"
 
 export const auth = betterAuth({
-  database: {
-    provider: "postgresql",
-    url: process.env.DATABASE_URL || "",
-  },
+  database: drizzleAdapter(db, {
+    provider: "pg",
+  }),
   emailAndPassword: {
     enabled: true,
   },
@@ -17,9 +15,8 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     },
   },
-  plugins: [nextCookies()],
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
-    updateAge: 60 * 60 * 24, // 24 hours
+    updateAge: 60 * 60 * 24, // 1 day
   },
 })

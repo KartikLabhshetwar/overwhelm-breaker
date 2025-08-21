@@ -11,16 +11,14 @@ export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
 
-  const sessionResult = authClient.useSession()
-  const session = sessionResult?.data
-  const isSessionLoading = sessionResult?.isPending
+  const { data: session, isPending } = authClient.useSession()
 
   useEffect(() => {
-    if (session && !isRedirecting && !isSessionLoading) {
+    if (session && !isRedirecting && !isPending) {
       setIsRedirecting(true)
       router.push("/dashboard")
     }
-  }, [session, router, isRedirecting, isSessionLoading])
+  }, [session, router, isRedirecting, isPending])
 
   const handleSignIn = async () => {
     try {
@@ -36,7 +34,7 @@ export default function SignIn() {
     }
   }
 
-  if (isSessionLoading || isRedirecting) {
+  if (isPending || isRedirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
