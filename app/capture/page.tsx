@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { authClient } from "@/lib/auth-client"
+import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,7 +15,7 @@ import { ArrowLeft, Sparkles, Clock, Target } from "lucide-react"
 import Link from "next/link"
 
 export default function CapturePage() {
-  const { data: session, isPending } = authClient.useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [hasRedirected, setHasRedirected] = useState(false)
@@ -28,11 +28,11 @@ export default function CapturePage() {
   })
 
   useEffect(() => {
-    if (!isPending && !session && !hasRedirected) {
+    if (status !== "loading" && !session && !hasRedirected) {
       setHasRedirected(true)
       router.push("/auth/signin")
     }
-  }, [session, isPending, hasRedirected, router])
+  }, [session, status, hasRedirected, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,7 +62,7 @@ export default function CapturePage() {
     }
   }
 
-  if (isPending) {
+  if (status === "loading") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center">
         <div className="text-center">

@@ -1,6 +1,6 @@
 "use client"
 
-import { authClient } from "@/lib/auth-client"
+import { useSession, signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -14,7 +14,7 @@ import { LogOut, Settings, User } from "lucide-react"
 import Link from "next/link"
 
 export function Navigation() {
-  const { data: session } = authClient.useSession()
+  const { data: session } = useSession()
 
   if (!session) return null
 
@@ -58,7 +58,7 @@ export function Navigation() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => authClient.signOut()}>
+              <DropdownMenuItem onClick={() => signOut()}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
               </DropdownMenuItem>

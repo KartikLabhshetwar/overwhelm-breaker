@@ -1,6 +1,6 @@
 "use client"
 
-import { authClient } from "@/lib/auth-client"
+import { signIn, useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
@@ -11,30 +11,27 @@ export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
 
-  const { data: session, isPending } = authClient.useSession()
+  const { data: session, status } = useSession()
 
   useEffect(() => {
-    if (session && !isRedirecting && !isPending) {
+    if (session && !isRedirecting && status !== "loading") {
       setIsRedirecting(true)
       router.push("/dashboard")
     }
-  }, [session, router, isRedirecting, isPending])
+  }, [session, router, isRedirecting, status])
 
   const handleSignIn = async () => {
     try {
       setIsLoading(true)
       console.log("[v0] Initiating Google sign-in...")
-      await authClient.signIn.social({
-        provider: "google",
-        callbackURL: "/dashboard",
-      })
+      await signIn("google", { callbackUrl: "/dashboard" })
     } catch (error) {
       console.error("[v0] Sign-in error:", error)
       setIsLoading(false)
     }
   }
 
-  if (isPending || isRedirecting) {
+  if (status === "loading" || isRedirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
