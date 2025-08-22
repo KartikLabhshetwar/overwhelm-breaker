@@ -7,6 +7,8 @@ import { db } from "@/lib/db"
 import { projects, tasks, chunks, users, sessions } from "@/lib/db/schema"
 import { createId } from "@paralleldrive/cuid2"
 import { eq } from "drizzle-orm"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 
 // Schema for AI-generated project breakdown
 const ProjectBreakdownSchema = z.object({
@@ -39,6 +41,8 @@ const ProjectBreakdownSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("[v0] Initializing database connection...")
+
     if (!process.env.GROQ_API_KEY) {
       console.error("[v0] GROQ_API_KEY environment variable is not set")
       return NextResponse.json(
@@ -47,15 +51,41 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
-    const { title, description, deadline, priority, context, userId } = body
-
-    if (!userId) {
-      return NextResponse.json({ error: "User ID required" }, { status: 401 })
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
+    console.log("[v0] Database connection initialized successfully")
+
+    const body = await request.json()
+    const { title, description, deadline, priority, context } = body
+
+    const sessionUserId = session.user.id || session.user.email
+
+    // Check if user exists, create if not
+    let user = await db.select().from(users).where(eq(users.id, sessionUserId)).limit(1)
+
+    if (user.length === 0) {
+      console.log("[v0] Creating new user record for:", session.user.email)
+      // Create user record from session data
+      await db.insert(users).values({
+        id: sessionUserId,
+        email: session.user.email,
+        name: session.user.name || session.user.email.split("@")[0],
+        timezone: "UTC",
+        workHours: { start: "09:00", end: "17:00" },
+        energyProfile: { morning: 80, afternoon: 60, evening: 40 },
+        defaultChunkMinutes: 10,
+      })
+
+      // Fetch the newly created user
+      user = await db.select().from(users).where(eq(users.id, sessionUserId)).limit(1)
+    }
+
+    const userId = sessionUserId
+
     // Get user preferences and history for personalization
-    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1)
     const userHistory = await db
       .select({
         chunkTitle: chunks.title,
