@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Clock, Target, Calendar, BarChart3 } from 'lucide-react'
+import { Badge } from "@/components/ui/badge"
+import { Plus, Clock, Target, Calendar, BarChart3, Zap } from 'lucide-react'
 import { Navigation } from "@/components/navigation"
 import Link from "next/link"
 
@@ -14,6 +15,19 @@ interface DashboardStats {
   todayChunks: number
   weekFocusTime: number
   completionRate: number
+}
+
+interface ScheduledChunk {
+  id: string
+  title: string
+  description: string
+  durationMin: number
+  energy: "low" | "med" | "high"
+  status: string
+  scheduledStart?: string
+  scheduledEnd?: string
+  taskTitle: string
+  projectTitle: string
 }
 
 export default function Dashboard() {
@@ -25,6 +39,8 @@ export default function Dashboard() {
     weekFocusTime: 0,
     completionRate: 0,
   })
+  const [todayChunks, setTodayChunks] = useState<ScheduledChunk[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     if (status === "loading") return
@@ -36,22 +52,60 @@ export default function Dashboard() {
   useEffect(() => {
     if (!session?.user?.id) return
 
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch("/api/dashboard/stats")
-        if (response.ok) {
-          const data = await response.json()
-          setStats(data)
+        // Fetch dashboard stats
+        const statsResponse = await fetch("/api/dashboard/stats")
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json()
+          setStats(statsData)
+        }
+
+        // Fetch today's scheduled chunks
+        const chunksResponse = await fetch("/api/chunks/unscheduled")
+        if (chunksResponse.ok) {
+          const chunksData = await chunksResponse.json()
+          // Filter for today's scheduled chunks
+          const today = new Date().toISOString().split('T')[0]
+          const todaysChunks = chunksData.scheduled.filter((chunk: ScheduledChunk) => {
+            if (!chunk.scheduledStart) return false
+            return chunk.scheduledStart.startsWith(today)
+          })
+          setTodayChunks(todaysChunks)
         }
       } catch (error) {
-        console.error("Error fetching dashboard stats:", error)
+        console.error("Error fetching data:", error)
+      } finally {
+        setIsLoading(false)
       }
     }
 
-    fetchStats()
+    fetchData()
   }, [session])
 
-  if (status === "loading") {
+  const getEnergyColor = (energy: string) => {
+    switch (energy) {
+      case "high":
+        return "bg-red-100 text-red-800 border-red-200"
+      case "med":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      case "low":
+        return "bg-green-100 text-green-800 border-green-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
+    }
+  }
+
+  const formatTime = (timeString: string | undefined) => {
+    if (!timeString) return ""
+    return new Date(timeString).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+  }
+
+  if (status === "loading" || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
@@ -172,11 +226,43 @@ export default function Dashboard() {
               <CardDescription className="text-emerald-700">Your focus chunks for today</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-emerald-600">
-                <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50 transition-transform duration-300 hover:scale-110" />
-                <p>No chunks scheduled for today</p>
-                <p className="text-sm mt-2">Create a project to get started!</p>
-              </div>
+              {todayChunks.length > 0 ? (
+                <div className="space-y-3 max-h-80 overflow-y-auto">
+                  {todayChunks.map((chunk) => (
+                    <div key={chunk.id} className="border border-emerald-100 rounded-lg p-3 bg-white">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-emerald-900 text-sm truncate">{chunk.title}</h4>
+                          <p className="text-xs text-emerald-600 truncate">{chunk.projectTitle} • {chunk.taskTitle}</p>
+                        </div>
+                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                          <Badge variant="outline" className={`${getEnergyColor(chunk.energy)} text-xs`}>
+                            <Zap className="w-2 h-2 mr-1" />
+                            {chunk.energy}
+                          </Badge>
+                          <Badge variant="outline" className="border-emerald-200 text-emerald-700 text-xs">
+                            {chunk.durationMin}m
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-emerald-700">
+                          {formatTime(chunk.scheduledStart)} - {formatTime(chunk.scheduledEnd)}
+                        </p>
+                        <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+                          <Link href={`/focus/${chunk.id}`}>Start</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-emerald-600">
+                  <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No chunks scheduled for today</p>
+                  <p className="text-sm mt-2">Create a project to get started!</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

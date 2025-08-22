@@ -184,20 +184,6 @@ export default function ProjectBreakdownPage() {
               </CardContent>
             </Card>
           </div>
-
-          <div className="flex gap-4 mb-8">
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
-              <Calendar className="w-4 h-4 mr-2" />
-              Schedule Chunks
-            </Button>
-            <Button
-              variant="outline"
-              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
-            >
-              <Play className="w-4 h-4 mr-2" />
-              Start First Chunk
-            </Button>
-          </div>
         </div>
 
         <div className="space-y-6">
