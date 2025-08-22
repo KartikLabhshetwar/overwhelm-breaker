@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Timer, Target, Calendar, BarChart3, ArrowRight, CheckCircle } from "lucide-react"
 
 export default function HomePage() {
   return (
@@ -34,15 +33,7 @@ export default function HomePage() {
                 >
                   <a href="/capture">
                     Start Breaking Down Tasks
-                    <ArrowRight className="ml-2 h-5 w-5" />
                   </a>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="text-lg px-8 py-6 bg-transparent transition-all duration-300 hover:scale-105 hover:shadow-md"
-                >
-                  See How It Works
                 </Button>
               </div>
             </div>
@@ -60,9 +51,8 @@ export default function HomePage() {
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-              <Card className="text-center transition-all duration-300 hover:shadow-lg hover:-translate-y-1 animate-in fade-in duration-1000 delay-300">
+              <Card className="text-center transition-all  hover:shadow-lg hover:-translate-y-1 animate-in fade-in duration-1000 delay-300">
                 <CardHeader>
-                  <Target className="w-12 h-12 text-primary mx-auto mb-4 transition-transform duration-300 hover:scale-110" />
                   <CardTitle>Smart Breakdown</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -72,9 +62,8 @@ export default function HomePage() {
                 </CardContent>
               </Card>
 
-              <Card className="text-center transition-all duration-300 hover:shadow-lg hover:-translate-y-1 animate-in fade-in duration-1000 delay-500">
+              <Card className="text-center transition-all hover:shadow-lg hover:-translate-y-1 animate-in fade-in duration-1000 delay-500">
                 <CardHeader>
-                  <Calendar className="w-12 h-12 text-primary mx-auto mb-4 transition-transform duration-300 hover:scale-110" />
                   <CardTitle>Auto Scheduling</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -84,9 +73,8 @@ export default function HomePage() {
                 </CardContent>
               </Card>
 
-              <Card className="text-center transition-all duration-300 hover:shadow-lg hover:-translate-y-1 animate-in fade-in duration-1000 delay-700">
+              <Card className="text-center transition-all hover:shadow-lg hover:-translate-y-1 animate-in fade-in duration-1000 delay-700">
                 <CardHeader>
-                  <Timer className="w-12 h-12 text-primary mx-auto mb-4 transition-transform duration-300 hover:scale-110" />
                   <CardTitle>Focus Timer</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -96,9 +84,8 @@ export default function HomePage() {
                 </CardContent>
               </Card>
 
-              <Card className="text-center transition-all duration-300 hover:shadow-lg hover:-translate-y-1 animate-in fade-in duration-1000 delay-900">
+              <Card className="text-center transition-all hover:shadow-lg hover:-translate-y-1 animate-in fade-in duration-1000 delay-900">
                 <CardHeader>
-                  <BarChart3 className="w-12 h-12 text-primary mx-auto mb-4 transition-transform duration-300 hover:scale-110" />
                   <CardTitle>Progress Insights</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -119,7 +106,6 @@ export default function HomePage() {
                 <h2 className="text-3xl lg:text-4xl font-bold mb-6">Stop Procrastinating, Start Progressing</h2>
                 <div className="space-y-4 mb-8">
                   <div className="flex items-start space-x-3">
-                    <CheckCircle className="h-6 w-6 text-primary mt-0.5 flex-shrink-0" />
                     <div>
                       <h3 className="font-semibold mb-1">Break the Overwhelm Cycle</h3>
                       <p className="text-muted-foreground">
@@ -128,7 +114,6 @@ export default function HomePage() {
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
-                    <CheckCircle className="h-6 w-6 text-primary mt-0.5 flex-shrink-0" />
                     <div>
                       <h3 className="font-semibold mb-1">Build Momentum Daily</h3>
                       <p className="text-muted-foreground">
@@ -137,7 +122,6 @@ export default function HomePage() {
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
-                    <CheckCircle className="h-6 w-6 text-primary mt-0.5 flex-shrink-0" />
                     <div>
                       <h3 className="font-semibold mb-1">Stay Consistently Focused</h3>
                       <p className="text-muted-foreground">
@@ -159,34 +143,6 @@ export default function HomePage() {
                   </p>
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA Section */}
-        <section className="py-20 bg-primary/5">
-          <div className="container mx-auto px-4">
-            <div className="text-center animate-in fade-in duration-1000 delay-1100">
-              <Card className="max-w-4xl mx-auto transition-all duration-300 hover:shadow-xl border-primary/20">
-                <CardHeader className="pb-8">
-                  <CardTitle className="text-3xl lg:text-4xl font-bold">Ready to Break Down Your First Task?</CardTitle>
-                  <CardDescription className="text-xl">
-                    Start with something that's been on your mind - we'll show you how it works.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <Button
-                    size="lg"
-                    className="text-lg px-8 py-6 transition-all duration-300 hover:scale-105 hover:shadow-lg"
-                    asChild
-                  >
-                    <a href="/capture">
-                      Get Started Now
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </a>
-                  </Button>
-                </CardContent>
-              </Card>
             </div>
           </div>
         </section>
