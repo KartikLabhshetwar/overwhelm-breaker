@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
+import { useTimer } from "@/contexts/timer-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Navigation } from "@/components/navigation"
-import { Play, Pause, Square, Clock, Zap, CheckCircle, AlertCircle, Coffee } from 'lucide-react'
+import { Play, Pause, Square, Clock, Zap, CheckCircle, AlertCircle, Coffee } from "lucide-react"
 
 interface Chunk {
   id: string
@@ -36,10 +37,9 @@ export default function FocusPage() {
   const params = useParams()
   const router = useRouter()
   const { data: session } = useSession()
+  const { timerState, startTimer, pauseTimer, resumeTimer, stopTimer } = useTimer()
   const [chunk, setChunk] = useState<Chunk | null>(null)
   const [currentSession, setCurrentSession] = useState<Session | null>(null)
-  const [timeLeft, setTimeLeft] = useState(0)
-  const [isRunning, setIsRunning] = useState(false)
   const [showCheckin, setShowCheckin] = useState(false)
   const [checkinSentiment, setCheckinSentiment] = useState<"good" | "neutral" | "stuck" | null>(null)
   const [blockerTag, setBlockerTag] = useState("")
@@ -55,7 +55,6 @@ export default function FocusPage() {
         if (response.ok) {
           const data = await response.json()
           setChunk(data)
-          setTimeLeft(data.durationMin * 60) // Convert to seconds
         }
       } catch (error) {
         console.error("Error fetching chunk:", error)
@@ -65,36 +64,20 @@ export default function FocusPage() {
     fetchChunk()
   }, [params.chunkId, session])
 
-  // Timer logic
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null
+    if (!chunk || !timerState.chunkId) return
 
-    if (isRunning && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((time) => {
-          const newTime = time - 1
-
-          // Show check-in at 5 minutes (halfway through 10-min chunk)
-          if (chunk && newTime === Math.floor((chunk.durationMin * 60) / 2) && !showCheckin) {
-            setShowCheckin(true)
-          }
-
-          // Session complete
-          if (newTime <= 0) {
-            setIsRunning(false)
-            setSessionComplete(true)
-            return 0
-          }
-
-          return newTime
-        })
-      }, 1000)
+    // Show check-in at halfway point
+    const halfwayPoint = Math.floor((chunk.durationMin * 60) / 2)
+    if (timerState.timeLeft === halfwayPoint && !showCheckin && timerState.isRunning) {
+      setShowCheckin(true)
     }
 
-    return () => {
-      if (interval) clearInterval(interval)
+    // Session complete
+    if (timerState.timeLeft <= 0 && timerState.isRunning) {
+      setSessionComplete(true)
     }
-  }, [isRunning, timeLeft, chunk, showCheckin])
+  }, [timerState.timeLeft, timerState.isRunning, chunk, showCheckin])
 
   const startSession = async () => {
     if (!chunk) return
@@ -109,26 +92,18 @@ export default function FocusPage() {
       if (response.ok) {
         const sessionData = await response.json()
         setCurrentSession(sessionData)
-        setIsRunning(true)
+        startTimer(chunk.id, sessionData.id, chunk.durationMin * 60, chunk.title)
       }
     } catch (error) {
       console.error("Error starting session:", error)
     }
   }
 
-  const pauseSession = () => {
-    setIsRunning(false)
-  }
-
-  const resumeSession = () => {
-    setIsRunning(true)
-  }
-
   const submitCheckin = async () => {
     if (!currentSession || !checkinSentiment) return
 
     try {
-      const elapsedMin = chunk ? Math.floor((chunk.durationMin * 60 - timeLeft) / 60) : 0
+      const elapsedMin = chunk ? Math.floor((chunk.durationMin * 60 - timerState.timeLeft) / 60) : 0
 
       await fetch("/api/checkins", {
         method: "POST",
@@ -153,7 +128,7 @@ export default function FocusPage() {
     if (!currentSession || !chunk) return
 
     try {
-      const actualMin = Math.ceil((chunk.durationMin * 60 - timeLeft) / 60)
+      const actualMin = Math.ceil((chunk.durationMin * 60 - timerState.timeLeft) / 60)
 
       await fetch(`/api/sessions/${currentSession.id}`, {
         method: "PATCH",
@@ -165,7 +140,6 @@ export default function FocusPage() {
         }),
       })
 
-      // Update chunk status
       await fetch(`/api/chunks/${chunk.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -174,6 +148,7 @@ export default function FocusPage() {
         }),
       })
 
+      stopTimer()
       router.push("/dashboard")
     } catch (error) {
       console.error("Error completing session:", error)
@@ -196,9 +171,12 @@ export default function FocusPage() {
     )
   }
 
-  const progress = chunk ? ((chunk.durationMin * 60 - timeLeft) / (chunk.durationMin * 60)) * 100 : 0
-  const minutes = Math.floor(timeLeft / 60)
-  const seconds = timeLeft % 60
+  const progress =
+    timerState.totalDuration > 0
+      ? ((timerState.totalDuration - timerState.timeLeft) / timerState.totalDuration) * 100
+      : 0
+  const minutes = Math.floor(timerState.timeLeft / 60)
+  const seconds = timerState.timeLeft % 60
 
   const getEnergyColor = (energy: string) => {
     switch (energy) {
@@ -217,39 +195,41 @@ export default function FocusPage() {
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50">
       <Navigation />
 
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 max-w-2xl">
         {/* Check-in Modal */}
         {showCheckin && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
             <Card className="w-full max-w-md animate-in slide-in-from-bottom duration-500">
-              <CardHeader>
-                <CardTitle className="text-emerald-900">Quick Check-in</CardTitle>
-                <CardDescription>How are you feeling about this chunk so far?</CardDescription>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-emerald-900 text-lg sm:text-xl">Quick Check-in</CardTitle>
+                <CardDescription className="text-sm sm:text-base">
+                  How are you feeling about this chunk so far?
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-3 gap-2">
                   <Button
                     variant={checkinSentiment === "good" ? "default" : "outline"}
                     onClick={() => setCheckinSentiment("good")}
-                    className="flex flex-col items-center p-4 h-auto transition-all duration-200 hover:scale-105"
+                    className="flex flex-col items-center p-3 sm:p-4 h-auto transition-all duration-200 hover:scale-105"
                   >
-                    <CheckCircle className="w-6 h-6 mb-1" />
+                    <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 mb-1" />
                     <span className="text-xs">Going well</span>
                   </Button>
                   <Button
                     variant={checkinSentiment === "neutral" ? "default" : "outline"}
                     onClick={() => setCheckinSentiment("neutral")}
-                    className="flex flex-col items-center p-4 h-auto transition-all duration-200 hover:scale-105"
+                    className="flex flex-col items-center p-3 sm:p-4 h-auto transition-all duration-200 hover:scale-105"
                   >
-                    <Clock className="w-6 h-6 mb-1" />
+                    <Clock className="w-5 h-5 sm:w-6 sm:h-6 mb-1" />
                     <span className="text-xs">Okay</span>
                   </Button>
                   <Button
                     variant={checkinSentiment === "stuck" ? "default" : "outline"}
                     onClick={() => setCheckinSentiment("stuck")}
-                    className="flex flex-col items-center p-4 h-auto transition-all duration-200 hover:scale-105"
+                    className="flex flex-col items-center p-3 sm:p-4 h-auto transition-all duration-200 hover:scale-105"
                   >
-                    <AlertCircle className="w-6 h-6 mb-1" />
+                    <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 mb-1" />
                     <span className="text-xs">Stuck</span>
                   </Button>
                 </div>
@@ -262,7 +242,7 @@ export default function FocusPage() {
                       value={blockerTag}
                       onChange={(e) => setBlockerTag(e.target.value)}
                       rows={2}
-                      className="transition-all duration-200 focus:ring-2 focus:ring-emerald-500"
+                      className="transition-all duration-200 focus:ring-2 focus:ring-emerald-500 text-sm"
                     />
                   </div>
                 )}
@@ -271,11 +251,15 @@ export default function FocusPage() {
                   <Button
                     onClick={submitCheckin}
                     disabled={!checkinSentiment}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 transition-all duration-200 hover:scale-105"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 transition-all duration-200 hover:scale-105 text-sm"
                   >
                     Continue
                   </Button>
-                  <Button variant="outline" onClick={() => setShowCheckin(false)} className="border-emerald-200 transition-all duration-200 hover:scale-105">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCheckin(false)}
+                    className="border-emerald-200 transition-all duration-200 hover:scale-105 text-sm"
+                  >
                     Skip
                   </Button>
                 </div>
@@ -288,9 +272,9 @@ export default function FocusPage() {
         {sessionComplete && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
             <Card className="w-full max-w-md animate-in slide-in-from-bottom duration-500">
-              <CardHeader>
-                <CardTitle className="text-emerald-900">Chunk Complete!</CardTitle>
-                <CardDescription>How did this session go?</CardDescription>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-emerald-900 text-lg sm:text-xl">Chunk Complete!</CardTitle>
+                <CardDescription className="text-sm sm:text-base">How did this session go?</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -300,30 +284,30 @@ export default function FocusPage() {
                     value={reflection}
                     onChange={(e) => setReflection(e.target.value)}
                     rows={3}
-                    className="transition-all duration-200 focus:ring-2 focus:ring-emerald-500"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-emerald-500 text-sm"
                   />
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
                   <Button
                     onClick={() => completeSession("done")}
-                    className="flex flex-col items-center p-4 h-auto bg-green-600 hover:bg-green-700 transition-all duration-200 hover:scale-105"
+                    className="flex flex-col items-center p-3 sm:p-4 h-auto bg-green-600 hover:bg-green-700 transition-all duration-200 hover:scale-105"
                   >
-                    <CheckCircle className="w-6 h-6 mb-1" />
+                    <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 mb-1" />
                     <span className="text-xs">Done!</span>
                   </Button>
                   <Button
                     onClick={() => completeSession("stuck")}
-                    className="flex flex-col items-center p-4 h-auto bg-orange-600 hover:bg-orange-700 transition-all duration-200 hover:scale-105"
+                    className="flex flex-col items-center p-3 sm:p-4 h-auto bg-orange-600 hover:bg-orange-700 transition-all duration-200 hover:scale-105"
                   >
-                    <AlertCircle className="w-6 h-6 mb-1" />
+                    <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 mb-1" />
                     <span className="text-xs">Stuck</span>
                   </Button>
                   <Button
                     onClick={() => completeSession("snoozed")}
-                    className="flex flex-col items-center p-4 h-auto bg-blue-600 hover:bg-blue-700 transition-all duration-200 hover:scale-105"
+                    className="flex flex-col items-center p-3 sm:p-4 h-auto bg-blue-600 hover:bg-blue-700 transition-all duration-200 hover:scale-105"
                   >
-                    <Coffee className="w-6 h-6 mb-1" />
+                    <Coffee className="w-5 h-5 sm:w-6 sm:h-6 mb-1" />
                     <span className="text-xs">Snooze</span>
                   </Button>
                 </div>
@@ -333,15 +317,17 @@ export default function FocusPage() {
         )}
 
         {/* Main Focus Interface */}
-        <div className="space-y-6 animate-in fade-in duration-700">
+        <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-700">
           <Card className="border-emerald-200 transition-all duration-300 hover:shadow-lg">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="text-emerald-900 mb-2">{chunk.title}</CardTitle>
-                  <CardDescription className="text-emerald-700 mb-4">{chunk.description}</CardDescription>
+            <CardHeader className="pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="text-emerald-900 mb-2 text-lg sm:text-xl break-words">{chunk.title}</CardTitle>
+                  <CardDescription className="text-emerald-700 mb-4 text-sm sm:text-base break-words">
+                    {chunk.description}
+                  </CardDescription>
                 </div>
-                <Badge variant="outline" className={getEnergyColor(chunk.energy)}>
+                <Badge variant="outline" className={`${getEnergyColor(chunk.energy)} flex-shrink-0 self-start`}>
                   <Zap className="w-3 h-3 mr-1" />
                   {chunk.energy} energy
                 </Badge>
@@ -350,16 +336,16 @@ export default function FocusPage() {
             <CardContent>
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-medium text-emerald-800 mb-2">Success Criteria:</h4>
-                  <p className="text-emerald-700 text-sm">{chunk.acceptanceCriteria}</p>
+                  <h4 className="font-medium text-emerald-800 mb-2 text-sm sm:text-base">Success Criteria:</h4>
+                  <p className="text-emerald-700 text-sm break-words">{chunk.acceptanceCriteria}</p>
                 </div>
 
                 {chunk.resources.length > 0 && (
                   <div>
-                    <h4 className="font-medium text-emerald-800 mb-2">Resources:</h4>
+                    <h4 className="font-medium text-emerald-800 mb-2 text-sm sm:text-base">Resources:</h4>
                     <div className="flex flex-wrap gap-1">
                       {chunk.resources.map((resource, idx) => (
-                        <Badge key={idx} variant="secondary" className="text-xs">
+                        <Badge key={idx} variant="secondary" className="text-xs break-all">
                           {resource}
                         </Badge>
                       ))}
@@ -372,37 +358,45 @@ export default function FocusPage() {
 
           {/* Timer */}
           <Card className="border-emerald-200 transition-all duration-300 hover:shadow-lg">
-            <CardContent className="p-8">
-              <div className="text-center space-y-6">
-                <div className="text-6xl font-mono font-bold text-emerald-900 transition-all duration-300">
-                  <span className={isRunning ? "animate-pulse" : ""}>
+            <CardContent className="p-4 sm:p-8">
+              <div className="text-center space-y-4 sm:space-y-6">
+                <div className="text-4xl sm:text-6xl font-mono font-bold text-emerald-900 transition-all duration-300">
+                  <span className={timerState.isRunning ? "animate-pulse" : ""}>
                     {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
                   </span>
                 </div>
 
-                <Progress value={progress} className="w-full h-3 transition-all duration-300" />
+                <Progress value={progress} className="w-full h-2 sm:h-3 transition-all duration-300" />
 
-                <div className="flex justify-center gap-4">
-                  {!currentSession ? (
-                    <Button onClick={startSession} size="lg" className="bg-emerald-600 hover:bg-emerald-700 transition-all duration-200 hover:scale-105">
-                      <Play className="w-5 h-5 mr-2" />
+                <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
+                  {!timerState.chunkId || timerState.chunkId !== chunk.id ? (
+                    <Button
+                      onClick={startSession}
+                      size="lg"
+                      className="bg-emerald-600 hover:bg-emerald-700 transition-all duration-200 hover:scale-105 w-full sm:w-auto"
+                    >
+                      <Play className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                       Start Focus Session
                     </Button>
                   ) : (
                     <>
-                      {isRunning ? (
+                      {timerState.isRunning ? (
                         <Button
-                          onClick={pauseSession}
+                          onClick={pauseTimer}
                           size="lg"
                           variant="outline"
-                          className="border-emerald-200 bg-transparent transition-all duration-200 hover:scale-105"
+                          className="border-emerald-200 bg-transparent transition-all duration-200 hover:scale-105 w-full sm:w-auto"
                         >
-                          <Pause className="w-5 h-5 mr-2" />
+                          <Pause className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                           Pause
                         </Button>
                       ) : (
-                        <Button onClick={resumeSession} size="lg" className="bg-emerald-600 hover:bg-emerald-700 transition-all duration-200 hover:scale-105">
-                          <Play className="w-5 h-5 mr-2" />
+                        <Button
+                          onClick={resumeTimer}
+                          size="lg"
+                          className="bg-emerald-600 hover:bg-emerald-700 transition-all duration-200 hover:scale-105 w-full sm:w-auto"
+                        >
+                          <Play className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                           Resume
                         </Button>
                       )}
@@ -411,17 +405,19 @@ export default function FocusPage() {
                         onClick={() => setSessionComplete(true)}
                         size="lg"
                         variant="outline"
-                        className="border-emerald-200 transition-all duration-200 hover:scale-105"
+                        className="border-emerald-200 transition-all duration-200 hover:scale-105 w-full sm:w-auto"
                       >
-                        <Square className="w-5 h-5 mr-2" />
+                        <Square className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                         End Session
                       </Button>
                     </>
                   )}
                 </div>
 
-                {currentSession && (
-                  <p className="text-sm text-emerald-600 animate-in fade-in duration-500">Session started • Stay focused on your success criteria</p>
+                {timerState.chunkId === chunk.id && (
+                  <p className="text-xs sm:text-sm text-emerald-600 animate-in fade-in duration-500">
+                    Session started • Stay focused on your success criteria
+                  </p>
                 )}
               </div>
             </CardContent>

@@ -2,7 +2,8 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter, Work_Sans } from "next/font/google"
 import "./globals.css"
-import { SessionProvider } from "./providers"
+import { Providers } from "./providers"
+import { GlobalTimerWidget } from "@/components/global-timer-widget"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -31,7 +32,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${workSans.variable}`}>
       <body className="font-sans antialiased">
-        <SessionProvider>{children}</SessionProvider>
+        <Providers>
+          {children}
+          <GlobalTimerWidget />
+        </Providers>
       </body>
     </html>
   )
