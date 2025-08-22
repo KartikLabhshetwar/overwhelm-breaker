@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { generateObject } from "ai"
-import { groq } from "@ai-sdk/groq"
+import { ChatGroq } from "@langchain/groq"
+import { StructuredOutputParser } from "langchain/output_parsers"
+import { PromptTemplate } from "@langchain/core/prompts"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { projects, tasks, chunks, users, sessions } from "@/lib/db/schema"
@@ -103,19 +104,29 @@ Use this context to create chunks that match the user's successful patterns and 
 `
     }
 
-    // Enhanced prompt with personalization
-    const prompt = `You are an expert productivity coach specializing in breaking down overwhelming projects into manageable 10-minute work chunks.
+    const model = new ChatGroq({
+      apiKey: process.env.GROQ_API_KEY,
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.7,
+    })
 
-${personalizedContext}
+    // Create structured output parser
+    const parser = StructuredOutputParser.fromZodSchema(ProjectBreakdownSchema)
+
+    // Enhanced prompt with personalization
+    const promptTemplate =
+      PromptTemplate.fromTemplate(`You are an expert productivity coach specializing in breaking down overwhelming projects into manageable 10-minute work chunks.
+
+{personalizedContext}
 
 TASK: Break down this project into a structured plan with tasks and 10-minute chunks.
 
 PROJECT DETAILS:
-Title: ${title}
-Description: ${description}
-Priority: ${priority}
-Deadline: ${deadline || "Not specified"}
-Additional Context: ${context || "None provided"}
+Title: {title}
+Description: {description}
+Priority: {priority}
+Deadline: {deadline}
+Additional Context: {context}
 
 BREAKDOWN REQUIREMENTS:
 1. Create 3-7 main tasks that represent logical phases or components
@@ -130,7 +141,7 @@ PERSONALIZATION GUIDELINES:
 - Match successful chunk patterns from user history
 - Avoid patterns that led to stuck sessions
 - Align energy requirements with user's energy profile
-- Use preferred chunk duration (${user[0]?.defaultChunkMinutes || 10} minutes as baseline)
+- Use preferred chunk duration (10 minutes as baseline)
 
 CHUNK GUIDELINES:
 - 10 minutes is the target (5-15 min range acceptable)
@@ -139,12 +150,20 @@ CHUNK GUIDELINES:
 - Consider cognitive load and energy requirements
 - Sequence logically with dependencies
 
-Focus on making this feel manageable and achievable rather than overwhelming.`
+Focus on making this feel manageable and achievable rather than overwhelming.
 
-    const result = await generateObject({
-      model: groq("llama-3.3-70b-versatile"),
-      prompt,
-      schema: ProjectBreakdownSchema,
+{format_instructions}`)
+
+    const chain = promptTemplate.pipe(model).pipe(parser)
+
+    const result = await chain.invoke({
+      title,
+      description,
+      priority,
+      deadline: deadline || "Not specified",
+      context: context || "None provided",
+      personalizedContext,
+      format_instructions: parser.getFormatInstructions(),
     })
 
     // Save to database
@@ -154,14 +173,14 @@ Focus on making this feel manageable and achievable rather than overwhelming.`
     await db.insert(projects).values({
       id: projectId,
       userId,
-      title: result.object.project.title,
-      description: result.object.project.description,
+      title: result.project.title,
+      description: result.project.description,
       deadline: deadline ? new Date(deadline) : null,
       priority: priority as "low" | "medium" | "high",
     })
 
     // Insert tasks and chunks
-    for (const [taskIndex, task] of result.object.tasks.entries()) {
+    for (const [taskIndex, task] of result.tasks.entries()) {
       const taskId = createId()
 
       await db.insert(tasks).values({
@@ -192,7 +211,7 @@ Focus on making this feel manageable and achievable rather than overwhelming.`
     return NextResponse.json({
       success: true,
       projectId,
-      breakdown: result.object,
+      breakdown: result,
     })
   } catch (error) {
     console.error("Error creating project breakdown:", error)
